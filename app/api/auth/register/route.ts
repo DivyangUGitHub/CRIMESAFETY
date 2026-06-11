@@ -16,7 +16,7 @@ const registerSchema = z.object({
     .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
   phone: z.string().optional(),
   location: z.string().optional(),
-  dateOfBirth: z.string().optional(),
+  // dateOfBirth: z.string().optional(),  // ❌ REMOVE THIS - field doesn't exist
   agreeTerms: z.boolean().refine(val => val === true, "You must agree to the terms"),
 });
 
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    const { name, email, password, phone, location, dateOfBirth } = validated.data;
+    const { name, email, password, phone, location } = validated.data;  // ❌ Remove dateOfBirth from here
     
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -60,17 +60,28 @@ export async function POST(req: NextRequest) {
         name,
         email,
         password: hashedPassword,
-        phone,
-        location,
-        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
+        phone: phone || null,
+        location: location || null,
+        // dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,  // ❌ REMOVE THIS LINE
         role: "USER",
         isActive: true,
       },
     });
     
- 
-    // Store verification token in a separate table (or as part of user record)
+    // Store verification token in a separate table
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Create email verification record
+    await prisma.emailVerification.create({
+      data: {
+        userId: user.id,
+        email: user.email,
+        code: verificationCode,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
+    
+    // Send verification email
     await EmailService.sendVerificationEmail(email, name, verificationCode);
     
     const { password: _, ...userWithoutPassword } = user;
@@ -79,7 +90,6 @@ export async function POST(req: NextRequest) {
       success: true,
       message: "Registration successful! Please verify your email.",
       user: userWithoutPassword,
-      verificationToken, // In production, send via email only
     }, { status: 201 });
     
   } catch (error) {
