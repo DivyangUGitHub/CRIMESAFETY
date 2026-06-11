@@ -84,7 +84,6 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// ✅ Activity Log Model
 model ActivityLog {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   userId    String   @db.ObjectId
@@ -101,7 +100,6 @@ model ActivityLog {
   @@map("activity_logs")
 }
 
-// ✅ Email Verification Model
 model EmailVerification {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   userId    String   @db.ObjectId
@@ -117,7 +115,6 @@ model EmailVerification {
   @@map("email_verifications")
 }
 
-// ✅ AI Analysis Log Model (No @db.Text)
 model AIAnalysisLog {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   reportId    String?  @db.ObjectId
@@ -133,7 +130,6 @@ model AIAnalysisLog {
   @@map("ai_analysis_logs")
 }
 
-// ✅ Police Station Model
 model PoliceStation {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
   name       String   @unique
@@ -149,7 +145,6 @@ model PoliceStation {
   @@map("police_stations")
 }
 
-// ✅ Report Update Model
 model ReportUpdate {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   reportId    String   @db.ObjectId
@@ -164,7 +159,6 @@ model ReportUpdate {
   @@map("report_updates")
 }
 
-// ✅ Notification Settings Model
 model NotificationSettings {
   id                String   @id @default(auto()) @map("_id") @db.ObjectId
   userId            String   @unique @db.ObjectId
@@ -180,7 +174,6 @@ model NotificationSettings {
   @@map("notification_settings")
 }
 
-// ✅ Comment Model (No @db.Text)
 model Comment {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   content     String
@@ -198,7 +191,6 @@ model Comment {
   @@map("comments")
 }
 
-// ✅ Session Model
 model Session {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   sessionToken String   @unique
@@ -211,7 +203,6 @@ model Session {
   @@map("sessions")
 }
 
-// ✅ Account Model
 model Account {
   id                String   @id @default(auto()) @map("_id") @db.ObjectId
   userId            String   @db.ObjectId
@@ -234,7 +225,6 @@ model Account {
   @@map("accounts")
 }
 
-// ✅ Verification Token Model (Fixed - MongoDB needs @id)
 model VerificationToken {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
   identifier String
@@ -259,12 +249,14 @@ model ContactMessage {
 
 model PasswordReset {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String   @unique @db.ObjectId
-  token     String   @unique
+  userId    String   @db.ObjectId
+  token     String
   expiresAt DateTime
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  @@unique([token])
+  @@index([userId])
+  @@index([expiresAt])
   @@map("password_resets")
 }
