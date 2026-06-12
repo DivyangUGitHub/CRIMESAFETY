@@ -173,9 +173,8 @@
 //     );
 //   }
 // }
-
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "../../../../lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 // GET single report - NO LOGIN REQUIRED
 export async function GET(
@@ -262,7 +261,7 @@ export async function GET(
   }
 }
 
-// POST comment on report - NO LOGIN REQUIRED (Anonymous allowed)
+// POST comment on report - NO LOGIN REQUIRED
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }
