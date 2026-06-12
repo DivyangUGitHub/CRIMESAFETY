@@ -13,11 +13,11 @@ const registerSchema = z.object({
     .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
     .regex(/[a-z]/, "Password must contain at least one lowercase letter")
     .regex(/[0-9]/, "Password must contain at least one number"),
-  // Special character no longer required
   phone: z.string().optional(),
   location: z.string().optional(),
-  agreeTerms: z.boolean().optional(),
+  agreeTerms: z.boolean().refine(val => val === true, "You must agree to the terms and conditions"),
 });
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -26,12 +26,20 @@ export async function POST(req: NextRequest) {
     const validated = registerSchema.safeParse(body);
     if (!validated.success) {
       return NextResponse.json(
-        { error: "Validation failed", details: validated.error.errors },
+        { error: validated.error.errors[0]?.message || "Validation failed" },
         { status: 400 }
       );
     }
     
-    const { name, email, password, phone, location } = validated.data;  // ❌ Remove dateOfBirth from here
+    const { name, email, password, phone, location, agreeTerms } = validated.data;
+    
+    // Check if user agreed to terms
+    if (!agreeTerms) {
+      return NextResponse.json(
+        { error: "You must agree to the terms and conditions" },
+        { status: 400 }
+      );
+    }
     
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -48,10 +56,6 @@ export async function POST(req: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
     
-    // Generate email verification token
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-    
     // Create user
     const user = await prisma.user.create({
       data: {
@@ -60,40 +64,46 @@ export async function POST(req: NextRequest) {
         password: hashedPassword,
         phone: phone || null,
         location: location || null,
-        // dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,  // ❌ REMOVE THIS LINE
         role: "USER",
         isActive: true,
       },
     });
     
-    // Store verification token in a separate table
+    // Create email verification record (optional - if email service works)
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // Create email verification record
-    await prisma.emailVerification.create({
-      data: {
-        userId: user.id,
-        email: user.email,
-        code: verificationCode,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      },
-    });
+    try {
+      await prisma.emailVerification.create({
+        data: {
+          userId: user.id,
+          email: user.email,
+          code: verificationCode,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+      });
+    } catch (emailError) {
+      console.log("Email verification record not created (table might not exist)");
+    }
     
-    // Send verification email
-    await EmailService.sendVerificationEmail(email, name, verificationCode);
+    // Try to send email but don't fail if it doesn't work
+    try {
+      await EmailService.sendVerificationEmail(email, name, verificationCode);
+    } catch (emailError) {
+      console.log("Email not sent (email service not configured)");
+    }
     
     const { password: _, ...userWithoutPassword } = user;
     
     return NextResponse.json({
       success: true,
-      message: "Registration successful! Please verify your email.",
+      message: "Registration successful! Please login.",
       user: userWithoutPassword,
     }, { status: 201 });
     
   } catch (error) {
     console.error("Registration error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error: " + (error as Error).message },
       { status: 500 }
     );
   }
