@@ -15,20 +15,14 @@ import {
   User,
   Building2,
   Image as ImageIcon,
-  Video,
   FileText,
   ChevronRight,
   ChevronLeft,
   CheckCircle,
   Loader2,
-  Camera,
-  Mic,
   Send,
   Trash2,
-  Eye,
-  EyeOff,
   Navigation,
-  Target,
   Wallet,
   ShieldAlert,
   Lock,
@@ -38,7 +32,6 @@ import {
   Car,
   Paintbrush,
 } from "lucide-react";
-import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import dynamic from "next/dynamic";
 import Navbar from "../../components/Navbar";
@@ -136,7 +129,6 @@ const nearbyStations = [
 
 export default function NewReportPage() {
   const router = useRouter();
-  const { data: session } = useSession();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
@@ -150,13 +142,11 @@ export default function NewReportPage() {
     title: "",
     category: "",
     description: "",
-    location: "",
     victims: "",
     contactNumber: "",
     timeOfOccurring: "",
     dateOfOccurring: "",
     nearbyStations: "",
-    isAnonymous: true,
   });
 
   // AI Category Detection
@@ -193,7 +183,6 @@ export default function NewReportPage() {
       const newFiles = Array.from(e.target.files);
       setFiles(prev => [...prev, ...newFiles]);
       
-      // Create preview URLs for images
       newFiles.forEach(file => {
         if (file.type.startsWith("image/")) {
           const reader = new FileReader();
@@ -208,7 +197,6 @@ export default function NewReportPage() {
     }
   };
 
-  // ✅ Fixed handleDrop function
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -217,7 +205,6 @@ export default function NewReportPage() {
     const droppedFiles = Array.from(e.dataTransfer.files);
     setFiles(prev => [...prev, ...droppedFiles]);
     
-    // Create preview URLs for images
     droppedFiles.forEach(file => {
       if (file.type.startsWith("image/")) {
         const reader = new FileReader();
@@ -238,7 +225,6 @@ export default function NewReportPage() {
 
   const handleLocationSelect = (lat: number, lng: number, address: string) => {
     setSelectedLocation({ lat, lng, address });
-    setFormData(prev => ({ ...prev, location: address }));
   };
 
   const validateStep = () => {
@@ -309,12 +295,19 @@ export default function NewReportPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...formData,
+          title: formData.title,
+          category: formData.category,
+          description: formData.description,
           latitude: selectedLocation?.lat,
           longitude: selectedLocation?.lng,
           address: selectedLocation?.address,
+          dateOfOccurring: formData.dateOfOccurring,
+          timeOfOccurring: formData.timeOfOccurring,
+          victims: formData.victims,
+          contactNumber: formData.contactNumber,
+          nearbyStations: formData.nearbyStations,
           images: uploadedImages,
-          isAnonymous: formData.isAnonymous,
+          isAnonymous: true,
         }),
       });
 
@@ -322,9 +315,11 @@ export default function NewReportPage() {
         toast.success("Crime report submitted successfully!", { id: loadingToast });
         router.push("/reports");
       } else {
-        toast.error("Failed to submit report", { id: loadingToast });
+        const error = await response.json();
+        toast.error(error.error || "Failed to submit report", { id: loadingToast });
       }
     } catch (error) {
+      console.error("Submit error:", error);
       toast.error("Something went wrong", { id: loadingToast });
     } finally {
       setLoading(false);
@@ -360,7 +355,6 @@ export default function NewReportPage() {
                   </p>
                 </div>
               ))}
-              {/* Progress Line */}
               <div className="absolute top-5 left-0 right-0 h-0.5 bg-white/10 -z-0">
                 <motion.div
                   className="h-full bg-gradient-to-r from-red-500 to-red-700"
@@ -380,23 +374,14 @@ export default function NewReportPage() {
             transition={{ duration: 0.3 }}
             className="bg-black/60 backdrop-blur-xl rounded-2xl border border-red-900/30 overflow-hidden"
           >
-            {/* Header */}
+            {/* Header - Anonymous Mode */}
             <div className="text-center py-8 px-6 border-b border-red-900/30 bg-gradient-to-r from-red-950/20 to-transparent">
               <Shield className="w-14 h-14 text-red-500 mx-auto mb-3 animate-pulse" />
               <h1 className="text-3xl font-bold text-white">Report a Crime</h1>
               <p className="text-gray-400 text-sm mt-2">
-                You will be submitting the report as:{" "}
-                <span className="text-red-400 font-medium">
-                  {formData.isAnonymous ? "Anonymous" : session?.user?.name || "User"}
-                </span>
+                Your report will be submitted <span className="text-red-400 font-medium">Anonymously</span>
               </p>
-              <button
-                onClick={() => setFormData(prev => ({ ...prev, isAnonymous: !prev.isAnonymous }))}
-                className="mt-2 text-xs text-gray-500 hover:text-red-400 transition flex items-center gap-1 mx-auto"
-              >
-                {formData.isAnonymous ? <EyeOff size={12} /> : <Eye size={12} />}
-                {formData.isAnonymous ? "Switch to named reporting" : "Switch to anonymous"}
-              </button>
+              <p className="text-gray-500 text-xs mt-1">No login required • Your identity is protected</p>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
@@ -418,7 +403,7 @@ export default function NewReportPage() {
                     />
                   </div>
 
-                  {/* Crime Category with AI Suggestion */}
+                  {/* Crime Category */}
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <label className="text-sm font-medium text-gray-300">
@@ -434,31 +419,31 @@ export default function NewReportPage() {
                         AI Suggest Category
                       </button>
                     </div>
-<div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-  {categories.map((cat) => (
-    <motion.button
-      key={cat.value}
-      type="button"
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={() => {
-        setFormData({ ...formData, category: cat.value });
-        setAiSuggestion(null);
-      }}
-      className={`p-3 rounded-xl text-left transition-all ${
-        formData.category === cat.value
-          ? `bg-gradient-to-r ${cat.color} text-white shadow-lg`
-          : "bg-white/5 border border-red-900/30 text-gray-300 hover:bg-white/10"
-      }`}
-    >
-      <div className="flex items-center gap-2 mb-1">
-        <cat.icon className="w-5 h-5" />
-        <span className="text-lg">{cat.label}</span>
-      </div>
-      <div className="text-xs opacity-80 line-clamp-1">{cat.description}</div>
-    </motion.button>
-  ))}
-</div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {categories.map((cat) => (
+                        <motion.button
+                          key={cat.value}
+                          type="button"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            setFormData({ ...formData, category: cat.value });
+                            setAiSuggestion(null);
+                          }}
+                          className={`p-3 rounded-xl text-left transition-all ${
+                            formData.category === cat.value
+                              ? `bg-gradient-to-r ${cat.color} text-white shadow-lg`
+                              : "bg-white/5 border border-red-900/30 text-gray-300 hover:bg-white/10"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <cat.icon className="w-5 h-5" />
+                            <span className="text-sm font-medium">{cat.label}</span>
+                          </div>
+                          <div className="text-xs opacity-80 line-clamp-1">{cat.description}</div>
+                        </motion.button>
+                      ))}
+                    </div>
                     {aiSuggestion && (
                       <motion.div
                         initial={{ opacity: 0, y: -10 }}
@@ -686,7 +671,7 @@ export default function NewReportPage() {
                         <p className="text-white text-sm">{formData.description?.substring(0, 200)}...</p>
                       </div>
                       <div>
-                        <p className="text-gray-500">Date & Time</p>
+                        <p className="text-gray-500">Date</p>
                         <p className="text-white">{formData.dateOfOccurring} {formData.timeOfOccurring}</p>
                       </div>
                       <div>
@@ -695,7 +680,7 @@ export default function NewReportPage() {
                       </div>
                       <div>
                         <p className="text-gray-500">Reporting As</p>
-                        <p className="text-white">{formData.isAnonymous ? "Anonymous" : session?.user?.name}</p>
+                        <p className="text-green-400">Anonymous</p>
                       </div>
                       <div>
                         <p className="text-gray-500">Media Files</p>
@@ -707,7 +692,7 @@ export default function NewReportPage() {
                   <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
                     <p className="text-yellow-400 text-sm flex items-start gap-2">
                       <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
-                      Please review all information carefully. False reporting may lead to legal consequences.
+                      Your report will be submitted anonymously. Your identity is protected. Please review all information carefully.
                     </p>
                   </div>
                 </motion.div>
@@ -748,7 +733,7 @@ export default function NewReportPage() {
                     className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 py-3 rounded-xl text-white font-medium transition disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-                    {loading ? "Submitting..." : "Submit Report"}
+                    {loading ? "Submitting..." : "Submit Report Anonymously"}
                   </motion.button>
                 )}
               </div>

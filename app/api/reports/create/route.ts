@@ -1,48 +1,61 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const body = await req.json();
-    const { title, description, category, severity, latitude, longitude, address, date, images, isAnonymous } = body;
+    const {
+      title,
+      category,
+      description,
+      latitude,
+      longitude,
+      address,
+      dateOfOccurring,
+      timeOfOccurring,
+      victims,
+      contactNumber,
+      nearbyStations,
+      images,
+    } = body;
 
     // Validation
-    if (!title || !description || !category || !date) {
+    if (!title || !category || !description || !dateOfOccurring) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       );
     }
 
+    // Generate anonymous ID
+    const anonymousId = `anon_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+
+    // Create report
     const report = await prisma.report.create({
       data: {
         title,
-        description,
         category,
-        severity: severity || "MEDIUM",
+        description,
         latitude: latitude || null,
         longitude: longitude || null,
         address: address || null,
-        date: new Date(date),
+        date: new Date(dateOfOccurring),
+        time: timeOfOccurring || null,
+        victims: victims || null,
+        contactNumber: contactNumber || null,
+        nearbyStations: nearbyStations || null,
         images: images || [],
-        userId: session.user.id,
-        isAnonymous: isAnonymous || false,
-        status: "PENDING"
-      }
+        isAnonymous: true,
+        status: "PENDING",
+        severity: "MEDIUM",
+        userId: anonymousId,
+      },
     });
 
-    return NextResponse.json({
-      success: true,
-      report
-    }, { status: 201 });
-
+    return NextResponse.json(
+      { success: true, message: "Report submitted successfully", report },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Create report error:", error);
     return NextResponse.json(
