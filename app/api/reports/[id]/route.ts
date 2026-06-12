@@ -23,6 +23,7 @@ export async function GET(
             role: true,
           },
         },
+        // verification: true,  // ❌ REMOVED - field doesn't exist
         updates: {
           orderBy: { createdAt: "desc" },
         },
@@ -91,16 +92,21 @@ export async function GET(
   }
 }
 
-// POST comment on report - Allow anonymous comments
+// POST comment on report
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    // Optional: Check if user is authenticated, but allow anonymous comments too
     const session = await getServerSession(authOptions);
-    const userId = session?.user?.id || `anonymous_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    const userName = session?.user?.name || "Anonymous User";
+    
+    // Check if user is authenticated
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
     
     const { id } = params;
     const body = await req.json();
@@ -117,7 +123,7 @@ export async function POST(
       data: {
         content,
         reportId: id,
-        userId: userId,
+        userId: (session.user as any).id,
       },
       include: {
         user: {
@@ -130,24 +136,33 @@ export async function POST(
       },
     });
     
-    // Update comment with anonymous name if no session
-    if (!session?.user?.id) {
-      await prisma.comment.update({
-        where: { id: comment.id },
+    // Get report owner for notification
+    const reportOwner = await prisma.report.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+    
+    // Create notification for report owner if not anonymous and not the commenter
+    if (reportOwner && reportOwner.user && !reportOwner.isAnonymous && reportOwner.userId !== (session.user as any).id) {
+      const commenterName = (session.user?.name as string) || "Someone";
+      
+      await prisma.notification.create({
         data: {
-          user: {
-            connect: { id: userId }
-          }
-        }
+          userId: reportOwner.userId,
+          title: "New comment on your report",
+          message: `${commenterName} commented on "${reportOwner.title}"`,
+          type: "REPORT_UPDATE",
+          // metadata: {   // ❌ REMOVED - field doesn't exist
+          //   reportId: id, 
+          //   commentId: comment.id 
+          // },
+        },
       });
     }
     
     return NextResponse.json({
       success: true,
-      comment: {
-        ...comment,
-        user: session?.user?.id ? comment.user : { name: "Anonymous", id: userId, image: null }
-      },
+      comment,
     }, { status: 201 });
     
   } catch (error) {
@@ -157,4 +172,4 @@ export async function POST(
       { status: 500 }
     );
   }
-} 
+}
