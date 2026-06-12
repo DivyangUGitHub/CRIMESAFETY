@@ -25,10 +25,10 @@ function rateLimit(request: NextRequest) {
   return true;
 }
 
-// Protected routes configuration
+// Protected routes configuration - /reports/new removed for anonymous access
 const protectedRoutes = [
   "/dashboard",
-  "/reports/new",
+  // "/reports/new",  // ✅ REMOVED - Anonymous reporting allowed
   "/reports/edit",
   "/profile",
   "/settings",
@@ -42,6 +42,7 @@ const publicRoutes = [
   "/contact",
   "/reports",
   "/reports/:path*", // Allow viewing reports without auth
+  "/reports/new",    // ✅ Added - anonymous reporting
 ];
 
 const adminRoutes = [
@@ -91,16 +92,15 @@ export default withAuth(
     
     // API rate limiting for sensitive endpoints
     if (path.startsWith("/api/") && request.method === "POST") {
-      const sensitiveEndpoints = ["/api/auth", "/api/reports/create", "/api/chat"];
+      const sensitiveEndpoints = ["/api/auth", "/api/chat"];
       if (sensitiveEndpoints.some(endpoint => path.includes(endpoint))) {
-        // Stricter rate limiting for sensitive APIs
         const ip = request.ip || request.headers.get("x-forwarded-for") || "unknown";
         const key = `${ip}:sensitive`;
         const now = Date.now();
         const requestLog = rateLimitMap.get(key) || [];
         const recentRequests = requestLog.filter((time: number) => now - time < 60 * 1000);
         
-        if (recentRequests.length >= 10) { // 10 requests per minute max
+        if (recentRequests.length >= 10) {
           return new NextResponse("Rate limit exceeded", { status: 429 });
         }
         
@@ -129,7 +129,6 @@ export default withAuth(
         
         if (!isProtectedRoute) return true;
         
-        // Allow access if authenticated
         return !!token;
       },
     },
@@ -140,16 +139,8 @@ export default withAuth(
   }
 );
 
-// Match all routes except static files and Next.js internals
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
