@@ -369,7 +369,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { 
       title, description, category, latitude, longitude, 
-      address, dateOfOccurring, images, isAnonymous, victims, contactNumber, nearbyStations
+      address, dateOfOccurring, images, isAnonymous
     } = body;
     
     if (!title || !description || !category || !dateOfOccurring) {
@@ -390,9 +390,6 @@ export async function POST(req: NextRequest) {
         longitude: longitude || null,
         address: address || null,
         date: new Date(dateOfOccurring),
-        victims: victims || null,
-        contactNumber: contactNumber || null,
-        nearbyStations: nearbyStations || null,
         images: images || [],
         userId: anonymousId,
         isAnonymous: true,
